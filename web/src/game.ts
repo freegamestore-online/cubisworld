@@ -1,5 +1,5 @@
 import kaplay from "kaplay";
-import type { SaveData, LevelDef, ObstacleDef } from "./types";
+import type { SaveData, LevelDef } from "./types";
 import { LEVELS } from "./lib/levelData";
 import { COLORS, FACES, COSTUMES, getColor, getFace, getCostume, RARITY_COLORS, RARITY_LABELS } from "./lib/cosmetics";
 import { loadSave, writeSave, addStars, spendStars, unlockItem } from "./lib/saveData";
@@ -9,28 +9,35 @@ type K = ReturnType<typeof kaplay>;
 const VW = 480;
 const VH = 720;
 
-// ─── palette ────────────────────────────────────────────────────────────────
+// ── palette ───────────────────────────────────────────────────────────────────
 const C = {
-  bg:      [18, 18, 28] as [number,number,number],
-  panel:   [30, 30, 48] as [number,number,number],
-  accent:  [180, 140, 255] as [number,number,number],
-  gold:    [255, 210, 60] as [number,number,number],
-  white:   [255, 255, 255] as [number,number,number],
-  dim:     [120, 120, 150] as [number,number,number],
-  green:   [100, 220, 140] as [number,number,number],
-  red:     [255, 100, 100] as [number,number,number],
+  bg:     [18, 18, 28]   as [number,number,number],
+  panel:  [34, 34, 54]   as [number,number,number],
+  accent: [180,140,255]  as [number,number,number],
+  gold:   [255,210, 60]  as [number,number,number],
+  white:  [255,255,255]  as [number,number,number],
+  dim:    [120,120,150]  as [number,number,number],
+  green:  [100,220,140]  as [number,number,number],
+  red:    [255,100,100]  as [number,number,number],
 };
 
-// ─── helpers ─────────────────────────────────────────────────────────────────
-function rgb(r:number,g:number,b:number){ return [r,g,b] as [number,number,number]; }
-
-function drawRoundRect(k: K, x:number, y:number, w:number, h:number, r:number, col:[number,number,number], alpha=1){
-  k.drawRect({ pos: k.vec2(x,y), width: w, height: h, radius: r,
-    color: k.rgb(...col), opacity: alpha });
+// ── hex → rgb helper ──────────────────────────────────────────────────────────
+function hexToRgb(hex: string): [number,number,number] {
+  const r = parseInt(hex.slice(1,3),16);
+  const g = parseInt(hex.slice(3,5),16);
+  const b = parseInt(hex.slice(5,7),16);
+  return [r,g,b];
 }
 
-function btn(k: K, label: string, x:number, y:number, w:number, h:number,
-  col:[number,number,number], textCol:[number,number,number], onClick:()=>void, size=16){
+// ── simple button ─────────────────────────────────────────────────────────────
+function btn(
+  k: K, label: string,
+  x: number, y: number, w: number, h: number,
+  col: [number,number,number],
+  textCol: [number,number,number],
+  onClick: () => void,
+  size = 16
+) {
   const b = k.add([
     k.rect(w, h, { radius: 10 }),
     k.color(...col),
@@ -38,7 +45,6 @@ function btn(k: K, label: string, x:number, y:number, w:number, h:number,
     k.anchor("center"),
     k.pos(x, y),
     k.opacity(1),
-    "btn",
   ]);
   k.add([
     k.text(label, { size, font: "sans-serif" }),
@@ -47,164 +53,195 @@ function btn(k: K, label: string, x:number, y:number, w:number, h:number,
     k.pos(x, y),
   ]);
   b.onClick(onClick);
-  b.onHover(() => { b.opacity = 0.85; });
+  b.onHover(() => { b.opacity = 0.82; });
   b.onHoverEnd(() => { b.opacity = 1; });
   return b;
 }
 
-// ─── draw the cube (used in menus + game) ────────────────────────────────────
-function drawCube(k: K, cx:number, cy:number, size:number,
-  colorId:string, faceId:string, costumeId:string,
-  squishY=1, squishX=1){
-  const col = getColor(colorId);
-  const face = getFace(faceId);
+// ── draw the cube (menus + gameplay) ─────────────────────────────────────────
+function drawCube(
+  k: K,
+  cx: number, cy: number, size: number,
+  colorId: string, faceId: string, costumeId: string,
+  squishY = 1, squishX = 1
+) {
+  const col     = getColor(colorId);
+  const face    = getFace(faceId);
   const costume = getCostume(costumeId);
   const w = size * squishX;
   const h = size * squishY;
 
   // shadow
-  k.drawEllipse({ pos: k.vec2(cx, cy + h/2 + 4), radiusX: w*0.45, radiusY: 6,
-    color: k.rgb(0,0,0), opacity: 0.18 });
+  k.drawEllipse({
+    pos: k.vec2(cx, cy + h/2 + 5),
+    radiusX: w * 0.44, radiusY: 5,
+    color: k.rgb(0,0,0), opacity: 0.18,
+  });
 
   // body
-  k.drawRect({ pos: k.vec2(cx - w/2, cy - h/2), width: w, height: h,
-    radius: size * 0.18, color: k.rgb(...col.rgb) });
+  k.drawRect({
+    pos: k.vec2(cx - w/2, cy - h/2),
+    width: w, height: h,
+    radius: size * 0.18,
+    color: k.rgb(...col.rgb),
+  });
 
   // shine
-  k.drawRect({ pos: k.vec2(cx - w/2 + 4, cy - h/2 + 4),
-    width: w*0.3, height: h*0.2, radius: 4,
-    color: k.rgb(255,255,255), opacity: 0.35 });
+  k.drawRect({
+    pos: k.vec2(cx - w/2 + 5, cy - h/2 + 5),
+    width: w * 0.28, height: h * 0.18,
+    radius: 4,
+    color: k.rgb(255,255,255), opacity: 0.38,
+  });
 
-  // face emoji
-  k.drawText({ text: face.emoji, pos: k.vec2(cx, cy + 2),
-    size: size * 0.48, font: "sans-serif", anchor: "center", color: k.rgb(255,255,255) });
+  // face
+  k.drawText({
+    text: face.emoji,
+    pos: k.vec2(cx, cy + 2),
+    size: size * 0.46,
+    font: "sans-serif",
+    anchor: "center",
+    color: k.rgb(255,255,255),
+  });
 
   // costume
   if (costume.id !== "none") {
     const hatY = cy - h/2 - 4;
-    switch(costume.id){
+    switch (costume.id) {
       case "bunny":
-        // two ears
-        k.drawRect({ pos: k.vec2(cx - w*0.22, hatY - 20), width: 10, height: 22, radius: 5, color: k.rgb(255,200,220) });
-        k.drawRect({ pos: k.vec2(cx + w*0.12, hatY - 20), width: 10, height: 22, radius: 5, color: k.rgb(255,200,220) });
-        k.drawRect({ pos: k.vec2(cx - w*0.20 + 2, hatY - 18), width: 6, height: 16, radius: 3, color: k.rgb(255,160,180) });
-        k.drawRect({ pos: k.vec2(cx + w*0.14, hatY - 18), width: 6, height: 16, radius: 3, color: k.rgb(255,160,180) });
+        k.drawRect({ pos: k.vec2(cx - w*0.22, hatY-22), width:10, height:22, radius:5, color: k.rgb(255,200,220) });
+        k.drawRect({ pos: k.vec2(cx + w*0.12, hatY-22), width:10, height:22, radius:5, color: k.rgb(255,200,220) });
+        k.drawRect({ pos: k.vec2(cx - w*0.20+2, hatY-20), width:6, height:16, radius:3, color: k.rgb(255,150,180) });
+        k.drawRect({ pos: k.vec2(cx + w*0.14,  hatY-20), width:6, height:16, radius:3, color: k.rgb(255,150,180) });
         break;
       case "tophat":
-        k.drawRect({ pos: k.vec2(cx - w*0.35, hatY - 2), width: w*0.7, height: 6, radius: 2, color: k.rgb(40,30,30) });
-        k.drawRect({ pos: k.vec2(cx - w*0.22, hatY - 22), width: w*0.44, height: 20, radius: 3, color: k.rgb(40,30,30) });
-        k.drawRect({ pos: k.vec2(cx - w*0.18, hatY - 18), width: w*0.36, height: 8, radius: 2, color: k.rgb(180,40,40) });
+        k.drawRect({ pos: k.vec2(cx - w*0.36, hatY-2),  width:w*0.72, height:6,  radius:2, color: k.rgb(40,30,30) });
+        k.drawRect({ pos: k.vec2(cx - w*0.22, hatY-22), width:w*0.44, height:20, radius:3, color: k.rgb(40,30,30) });
+        k.drawRect({ pos: k.vec2(cx - w*0.18, hatY-18), width:w*0.36, height:8,  radius:2, color: k.rgb(180,40,40) });
         break;
       case "bow":
-        k.drawRect({ pos: k.vec2(cx - 14, hatY - 10), width: 12, height: 10, radius: 4, color: k.rgb(255,100,160) });
-        k.drawRect({ pos: k.vec2(cx + 2, hatY - 10), width: 12, height: 10, radius: 4, color: k.rgb(255,100,160) });
-        k.drawCircle({ pos: k.vec2(cx, hatY - 5), radius: 4, color: k.rgb(255,60,130) });
+        k.drawRect({ pos: k.vec2(cx-15, hatY-10), width:12, height:10, radius:4, color: k.rgb(255,100,160) });
+        k.drawRect({ pos: k.vec2(cx+3,  hatY-10), width:12, height:10, radius:4, color: k.rgb(255,100,160) });
+        k.drawCircle({ pos: k.vec2(cx, hatY-5), radius:4, color: k.rgb(255,50,130) });
         break;
       case "cap":
-        k.drawRect({ pos: k.vec2(cx - w*0.38, hatY - 2), width: w*0.76, height: 5, radius: 2, color: k.rgb(80,120,220) });
-        k.drawRect({ pos: k.vec2(cx - w*0.24, hatY - 18), width: w*0.48, height: 16, radius: 5, color: k.rgb(80,120,220) });
-        k.drawRect({ pos: k.vec2(cx - w*0.08, hatY - 14), width: w*0.2, height: 8, radius: 2, color: k.rgb(255,255,255), opacity: 0.4 });
+        k.drawRect({ pos: k.vec2(cx - w*0.38, hatY-2),  width:w*0.76, height:5,  radius:2, color: k.rgb(80,120,220) });
+        k.drawRect({ pos: k.vec2(cx - w*0.24, hatY-18), width:w*0.48, height:16, radius:5, color: k.rgb(80,120,220) });
+        k.drawRect({ pos: k.vec2(cx - w*0.08, hatY-14), width:w*0.2,  height:8,  radius:2, color: k.rgb(255,255,255), opacity:0.38 });
         break;
       case "flowercrown":
-        for(let i=0;i<5;i++){
-          const fx = cx + (i-2)*10;
-          k.drawCircle({ pos: k.vec2(fx, hatY - 8), radius: 6, color: k.rgb(255,160,200) });
-          k.drawCircle({ pos: k.vec2(fx, hatY - 8), radius: 3, color: k.rgb(255,230,100) });
+        for (let i = 0; i < 5; i++) {
+          const fx = cx + (i-2)*11;
+          k.drawCircle({ pos: k.vec2(fx, hatY-8), radius:6, color: k.rgb(255,160,200) });
+          k.drawCircle({ pos: k.vec2(fx, hatY-8), radius:3, color: k.rgb(255,230,100) });
         }
         break;
       case "crown":
-        k.drawRect({ pos: k.vec2(cx - w*0.28, hatY - 16), width: w*0.56, height: 14, radius: 2, color: k.rgb(255,200,30) });
-        k.drawRect({ pos: k.vec2(cx - w*0.28, hatY - 22), width: 8, height: 8, radius: 2, color: k.rgb(255,200,30) });
-        k.drawRect({ pos: k.vec2(cx - w*0.04, hatY - 24), width: 8, height: 10, radius: 2, color: k.rgb(255,200,30) });
-        k.drawRect({ pos: k.vec2(cx + w*0.20, hatY - 22), width: 8, height: 8, radius: 2, color: k.rgb(255,200,30) });
-        k.drawCircle({ pos: k.vec2(cx, hatY - 20), radius: 3, color: k.rgb(255,100,100) });
+        k.drawRect({ pos: k.vec2(cx - w*0.28, hatY-16), width:w*0.56, height:14, radius:2, color: k.rgb(255,200,30) });
+        k.drawRect({ pos: k.vec2(cx - w*0.28, hatY-22), width:8, height:8, radius:2, color: k.rgb(255,200,30) });
+        k.drawRect({ pos: k.vec2(cx - w*0.04, hatY-24), width:8, height:10, radius:2, color: k.rgb(255,200,30) });
+        k.drawRect({ pos: k.vec2(cx + w*0.20, hatY-22), width:8, height:8, radius:2, color: k.rgb(255,200,30) });
+        k.drawCircle({ pos: k.vec2(cx, hatY-20), radius:3, color: k.rgb(255,100,100) });
         break;
       case "catears":
-        k.drawRect({ pos: k.vec2(cx - w*0.25, hatY - 18), width: 10, height: 16,
-          radius: 3, color: k.rgb(255,180,200) });
-        k.drawRect({ pos: k.vec2(cx + w*0.15, hatY - 18), width: 10, height: 16,
-          radius: 3, color: k.rgb(255,180,200) });
-        k.drawRect({ pos: k.vec2(cx - w*0.23 + 2, hatY - 16), width: 6, height: 10,
-          radius: 2, color: k.rgb(255,130,160) });
-        k.drawRect({ pos: k.vec2(cx + w*0.17, hatY - 16), width: 6, height: 10,
-          radius: 2, color: k.rgb(255,130,160) });
+        k.drawRect({ pos: k.vec2(cx - w*0.25, hatY-18), width:10, height:16, radius:3, color: k.rgb(255,180,200) });
+        k.drawRect({ pos: k.vec2(cx + w*0.15, hatY-18), width:10, height:16, radius:3, color: k.rgb(255,180,200) });
+        k.drawRect({ pos: k.vec2(cx - w*0.23+2, hatY-16), width:6, height:10, radius:2, color: k.rgb(255,130,160) });
+        k.drawRect({ pos: k.vec2(cx + w*0.17,   hatY-16), width:6, height:10, radius:2, color: k.rgb(255,130,160) });
         break;
       case "froghat":
-        k.drawRect({ pos: k.vec2(cx - w*0.3, hatY - 16), width: w*0.6, height: 14,
-          radius: 6, color: k.rgb(80,180,80) });
-        k.drawCircle({ pos: k.vec2(cx - w*0.12, hatY - 16), radius: 5, color: k.rgb(100,210,100) });
-        k.drawCircle({ pos: k.vec2(cx + w*0.12, hatY - 16), radius: 5, color: k.rgb(100,210,100) });
-        k.drawCircle({ pos: k.vec2(cx - w*0.12, hatY - 16), radius: 2, color: k.rgb(20,20,20) });
-        k.drawCircle({ pos: k.vec2(cx + w*0.12, hatY - 16), radius: 2, color: k.rgb(20,20,20) });
+        k.drawRect({ pos: k.vec2(cx - w*0.30, hatY-16), width:w*0.60, height:14, radius:6, color: k.rgb(80,180,80) });
+        k.drawCircle({ pos: k.vec2(cx - w*0.12, hatY-16), radius:5, color: k.rgb(100,210,100) });
+        k.drawCircle({ pos: k.vec2(cx + w*0.12, hatY-16), radius:5, color: k.rgb(100,210,100) });
+        k.drawCircle({ pos: k.vec2(cx - w*0.12, hatY-16), radius:2, color: k.rgb(20,20,20) });
+        k.drawCircle({ pos: k.vec2(cx + w*0.12, hatY-16), radius:2, color: k.rgb(20,20,20) });
         break;
       case "scarf":
-        k.drawRect({ pos: k.vec2(cx - w*0.4, cy + h*0.25), width: w*0.8, height: 10,
-          radius: 4, color: k.rgb(255,120,120) });
-        k.drawRect({ pos: k.vec2(cx - w*0.3, cy + h*0.35), width: 14, height: 18,
-          radius: 4, color: k.rgb(255,120,120) });
+        k.drawRect({ pos: k.vec2(cx - w*0.40, cy + h*0.25), width:w*0.80, height:10, radius:4, color: k.rgb(255,120,120) });
+        k.drawRect({ pos: k.vec2(cx - w*0.30, cy + h*0.35), width:14, height:18, radius:4, color: k.rgb(255,120,120) });
         break;
       case "starhalo":
-        for(let i=0;i<6;i++){
-          const angle = (i/6)*Math.PI*2;
-          const sx = cx + Math.cos(angle)*w*0.38;
-          const sy = (cy - h/2 - 10) + Math.sin(angle)*6;
-          k.drawText({ text:"⭐", pos: k.vec2(sx, sy), size: 10,
-            font:"sans-serif", anchor:"center", color: k.rgb(255,220,60) });
+        for (let i = 0; i < 6; i++) {
+          const ang = (i/6)*Math.PI*2;
+          const sx = cx + Math.cos(ang)*w*0.38;
+          const sy = (cy - h/2 - 10) + Math.sin(ang)*5;
+          k.drawText({ text:"⭐", pos:k.vec2(sx,sy), size:9, font:"sans-serif", anchor:"center", color:k.rgb(255,220,60) });
         }
         break;
       case "mushroom":
-        k.drawRect({ pos: k.vec2(cx - w*0.22, hatY - 4), width: w*0.44, height: 6,
-          radius: 2, color: k.rgb(240,220,200) });
-        k.drawEllipse({ pos: k.vec2(cx, hatY - 18), radiusX: w*0.32, radiusY: 16,
-          color: k.rgb(220,60,60) });
-        for(let i=0;i<3;i++){
-          k.drawCircle({ pos: k.vec2(cx + (i-1)*12, hatY - 20), radius: 4,
-            color: k.rgb(255,255,255) });
-        }
+        k.drawRect({ pos: k.vec2(cx - w*0.22, hatY-4), width:w*0.44, height:6, radius:2, color: k.rgb(240,220,200) });
+        k.drawEllipse({ pos: k.vec2(cx, hatY-18), radiusX:w*0.32, radiusY:16, color: k.rgb(220,60,60) });
+        for (let i = 0; i < 3; i++)
+          k.drawCircle({ pos: k.vec2(cx+(i-1)*12, hatY-20), radius:4, color: k.rgb(255,255,255) });
         break;
     }
   }
 }
 
-// ─── particle burst ───────────────────────────────────────────────────────────
-function spawnParticles(k: K, x:number, y:number, col:[number,number,number], count=8){
-  for(let i=0;i<count;i++){
-    const angle = (i/count)*Math.PI*2;
-    const speed = k.rand(60,140);
+// ── particle burst ────────────────────────────────────────────────────────────
+function spawnParticles(k: K, x: number, y: number, col: [number,number,number], count = 8) {
+  for (let i = 0; i < count; i++) {
+    const angle = (i / count) * Math.PI * 2;
+    const speed = k.rand(60, 150);
+    const vx = Math.cos(angle) * speed;
+    const vy = Math.sin(angle) * speed;
     const p = k.add([
       k.circle(k.rand(3,6)),
       k.color(...col),
-      k.pos(x,y),
+      k.pos(x, y),
       k.opacity(1),
       k.anchor("center"),
-      { vx: Math.cos(angle)*speed, vy: Math.sin(angle)*speed, life: 0.6 },
     ]);
-    const up = k.onUpdate(() => {
-      p.pos.x += p.vx * k.dt();
-      p.pos.y += p.vy * k.dt();
-      p.opacity -= k.dt() / p.life;
-      if(p.opacity <= 0){ k.destroy(p); up.cancel(); }
+    let life = 0.6;
+    const upd = k.onUpdate(() => {
+      p.pos.x += vx * k.dt();
+      p.pos.y += vy * k.dt();
+      p.opacity -= k.dt() / life;
+      if (p.opacity <= 0) { k.destroy(p); upd.cancel(); }
     });
   }
 }
 
-// ─── floating star particles in bg ───────────────────────────────────────────
-function addBgStars(k: K, count=30){
-  for(let i=0;i<count;i++){
-    const x = k.rand(0,VW), y = k.rand(0,VH);
-    const s = k.rand(1,3);
+// ── twinkling background stars ────────────────────────────────────────────────
+function addBgStars(k: K, count = 28) {
+  for (let i = 0; i < count; i++) {
+    const x = k.rand(0, VW);
+    const y = k.rand(0, VH);
+    const s = k.rand(1, 2.5);
+    const phase = k.rand(0, Math.PI*2);
+    const drift = k.rand(0.4, 1.2);
     const p = k.add([
-      k.circle(s), k.color(255,255,255), k.opacity(k.rand(0.2,0.7)),
-      k.pos(x,y), k.anchor("center"),
-      { drift: k.rand(0.2,0.8), phase: k.rand(0,Math.PI*2) },
+      k.circle(s),
+      k.color(255,255,255),
+      k.opacity(0.4),
+      k.pos(x, y),
+      k.anchor("center"),
     ]);
-    k.onUpdate(() => {
-      p.opacity = 0.3 + Math.sin(k.time()*p.drift + p.phase)*0.3;
-    });
+    k.onUpdate(() => { p.opacity = 0.25 + Math.sin(k.time()*drift + phase)*0.25; });
   }
 }
 
-// ─── MAIN ────────────────────────────────────────────────────────────────────
+// ── toast message ─────────────────────────────────────────────────────────────
+function flashMsg(k: K, msg: string) {
+  const t = k.add([
+    k.text(msg, { size: 16, font: "sans-serif" }),
+    k.color(...C.white),
+    k.anchor("center"),
+    k.pos(VW/2, VH/2 - 60),
+    k.opacity(1),
+  ]);
+  let life = 1.6;
+  const upd = k.onUpdate(() => {
+    life -= k.dt();
+    t.opacity = Math.min(1, life * 1.4);
+    t.pos.y -= 30 * k.dt();
+    if (life <= 0) { k.destroy(t); upd.cancel(); }
+  });
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// MAIN ENTRY
+// ═════════════════════════════════════════════════════════════════════════════
 export function startGame(canvas: HTMLCanvasElement, onScore: (n: number) => void): () => void {
   const k = kaplay({
     canvas,
@@ -218,184 +255,176 @@ export function startGame(canvas: HTMLCanvasElement, onScore: (n: number) => voi
 
   let save = loadSave();
 
-  // ═══════════════════════════════════════════════════════════════════════════
-  // SCENE: MENU
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ── SCENE: MENU ────────────────────────────────────────────────────────────
   k.scene("menu", () => {
     save = loadSave();
     addBgStars(k);
 
-    // title
-    k.add([k.text("CUBIworld", { size: 44, font:"sans-serif" }),
-      k.color(...C.accent), k.anchor("center"), k.pos(VW/2, 110)]);
-    k.add([k.text("✦ Cozy Rhythm Platformer ✦", { size: 14, font:"sans-serif" }),
-      k.color(...C.dim), k.anchor("center"), k.pos(VW/2, 148)]);
+    k.add([k.text("CUBIworld", { size: 46, font:"sans-serif" }),
+      k.color(...C.accent), k.anchor("center"), k.pos(VW/2, 108)]);
+    k.add([k.text("✦ Cozy Rhythm Platformer ✦", { size: 13, font:"sans-serif" }),
+      k.color(...C.dim), k.anchor("center"), k.pos(VW/2, 146)]);
+    k.add([k.text(`⭐ ${save.stars.toLocaleString()} Stars`, { size: 17, font:"sans-serif" }),
+      k.color(...C.gold), k.anchor("center"), k.pos(VW/2, 178)]);
 
-    // star display
-    k.add([k.text(`⭐ ${save.stars.toLocaleString()} Stars`, { size: 18, font:"sans-serif" }),
-      k.color(...C.gold), k.anchor("center"), k.pos(VW/2, 180)]);
-
-    // cube preview
+    // animated cube preview
     k.onDraw(() => {
-      drawCube(k, VW/2, 270, 72, save.equippedColor, save.equippedFace, save.equippedCostume,
+      drawCube(k, VW/2, 268, 70,
+        save.equippedColor, save.equippedFace, save.equippedCostume,
         1 + Math.sin(k.time()*2)*0.04);
     });
 
-    btn(k,"▶  Play",        VW/2, 370, 200, 48, C.accent,  C.white, () => k.go("levelselect"), 20);
-    btn(k,"🎨 Customise",   VW/2, 430, 200, 44, C.panel,   C.white, () => k.go("customise"));
-    btn(k,"🛍️  Shop",        VW/2, 484, 200, 44, C.panel,   C.white, () => k.go("shop"));
-    btn(k,"👤 Profile",     VW/2, 538, 200, 44, C.panel,   C.white, () => k.go("profile"));
+    btn(k, "▶  Play",       VW/2, 366, 200, 48, C.accent, C.white, () => k.go("levelselect"), 20);
+    btn(k, "🎨 Customise",  VW/2, 426, 200, 44, C.panel,  C.white, () => k.go("customise"));
+    btn(k, "🛍️  Shop",       VW/2, 480, 200, 44, C.panel,  C.white, () => k.go("shop"));
+    btn(k, "👤 Profile",    VW/2, 534, 200, 44, C.panel,  C.white, () => k.go("profile"));
 
-    k.add([k.text("tap or press SPACE to jump during play", { size: 11, font:"sans-serif" }),
-      k.color(...C.dim), k.anchor("center"), k.pos(VW/2, 620)]);
+    k.add([k.text("SPACE / tap to jump during play", { size: 11, font:"sans-serif" }),
+      k.color(...C.dim), k.anchor("center"), k.pos(VW/2, 618)]);
   });
 
-  // ═══════════════════════════════════════════════════════════════════════════
-  // SCENE: LEVEL SELECT
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ── SCENE: LEVEL SELECT ────────────────────────────────────────────────────
   k.scene("levelselect", () => {
     save = loadSave();
     addBgStars(k);
 
     k.add([k.text("Choose Level", { size: 28, font:"sans-serif" }),
       k.color(...C.white), k.anchor("center"), k.pos(VW/2, 44)]);
+    btn(k, "← Back", 52, 44, 80, 34, C.panel, C.white, () => k.go("menu"), 13);
 
-    btn(k,"← Back", 52, 44, 80, 36, C.panel, C.white, () => k.go("menu"), 13);
-
-    const cols = 2, rows = 5;
-    const cardW = 200, cardH = 80, gapX = 16, gapY = 10;
+    const cardW = 200, cardH = 80, gapX = 14, gapY = 8;
+    const cols = 2;
     const startX = (VW - (cols*cardW + (cols-1)*gapX))/2 + cardW/2;
     const startY = 90;
 
     LEVELS.forEach((lvl, i) => {
-      const col = i % cols, row = Math.floor(i / cols);
+      const col = i % cols;
+      const row = Math.floor(i / cols);
       const cx = startX + col*(cardW+gapX);
       const cy = startY + row*(cardH+gapY) + cardH/2;
-      const lsave = save.levels[lvl.id];
-      const completed = lsave?.completed ?? false;
-      const starsEarned = lsave?.stars ?? 0;
+      const lsave  = save.levels[lvl.id];
+      const done   = lsave?.completed ?? false;
+      const earned = lsave?.stars ?? 0;
       const locked = i > 0 && !(save.levels[LEVELS[i-1]!.id]?.completed);
+      const cardCol: [number,number,number] = locked ? [24,24,38] : done ? [30,56,36] : C.panel;
 
-      const cardCol: [number,number,number] = locked ? [25,25,40] : completed ? [40,60,40] : C.panel;
+      k.add([k.rect(cardW, cardH, { radius: 12 }),
+        k.color(...cardCol), k.anchor("center"), k.pos(cx, cy)]);
 
-      k.add([k.rect(cardW, cardH, { radius: 12 }), k.color(...cardCol),
-        k.anchor("center"), k.pos(cx, cy)]);
+      k.add([k.text(`${lvl.emoji} ${i+1}. ${lvl.name}`, { size: 12, font:"sans-serif" }),
+        k.color(...(locked ? C.dim : C.white)), k.anchor("center"), k.pos(cx, cy-18)]);
 
-      k.add([k.text(`${lvl.emoji} ${i+1}. ${lvl.name}`, { size: 13, font:"sans-serif" }),
-        k.color(locked ? C.dim : C.white), k.anchor("center"), k.pos(cx, cy-16)]);
-
-      // stars
-      const starStr = [0,1,2].map(s => s < starsEarned ? "⭐" : "☆").join(" ");
+      const starStr = [0,1,2].map(s => s < earned ? "⭐" : "☆").join(" ");
       k.add([k.text(starStr, { size: 14, font:"sans-serif" }),
-        k.color(...C.gold), k.anchor("center"), k.pos(cx, cy+8)]);
+        k.color(...C.gold), k.anchor("center"), k.pos(cx, cy+4)]);
 
-      if(locked){
-        k.add([k.text("🔒 Complete previous level", { size: 10, font:"sans-serif" }),
-          k.color(...C.dim), k.anchor("center"), k.pos(cx, cy+26)]);
+      if (locked) {
+        k.add([k.text("🔒 Complete previous level", { size: 9, font:"sans-serif" }),
+          k.color(...C.dim), k.anchor("center"), k.pos(cx, cy+22)]);
       } else {
-        const card = k.add([k.rect(cardW, cardH, { radius: 12 }),
-          k.color(...cardCol), k.area(), k.anchor("center"), k.pos(cx, cy), k.opacity(0)]);
-        card.onClick(() => k.go("play", lvl.id));
+        const hitbox = k.add([
+          k.rect(cardW, cardH, { radius: 12 }),
+          k.color(255,255,255),
+          k.area(),
+          k.anchor("center"),
+          k.pos(cx, cy),
+          k.opacity(0),
+        ]);
+        hitbox.onClick(() => k.go("play", lvl.id));
       }
     });
   });
 
-  // ═══════════════════════════════════════════════════════════════════════════
-  // SCENE: CUSTOMISE
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ── SCENE: CUSTOMISE ───────────────────────────────────────────────────────
   k.scene("customise", () => {
     save = loadSave();
-    let selColor = save.equippedColor;
-    let selFace  = save.equippedFace;
+    let selColor   = save.equippedColor;
+    let selFace    = save.equippedFace;
     let selCostume = save.equippedCostume;
     let tab: "color"|"face"|"costume" = "color";
 
     k.add([k.text("Customise Cube", { size: 26, font:"sans-serif" }),
       k.color(...C.white), k.anchor("center"), k.pos(VW/2, 36)]);
-    btn(k,"← Back", 52, 36, 80, 32, C.panel, C.white, () => k.go("menu"), 13);
+    btn(k, "← Back", 52, 36, 80, 30, C.panel, C.white, () => k.go("menu"), 13);
 
-    // preview area
-    k.add([k.rect(160, 160, { radius: 16 }), k.color(...C.panel),
-      k.anchor("center"), k.pos(VW/2, 140)]);
+    // preview box
+    k.add([k.rect(150, 150, { radius: 16 }), k.color(...C.panel),
+      k.anchor("center"), k.pos(VW/2, 138)]);
     k.onDraw(() => {
-      drawCube(k, VW/2, 140, 64, selColor, selFace, selCostume,
+      drawCube(k, VW/2, 138, 60, selColor, selFace, selCostume,
         1 + Math.sin(k.time()*1.8)*0.05);
     });
 
-    // tabs
-    const tabs: Array<{id:"color"|"face"|"costume", label:string}> = [
-      { id:"color", label:"🎨 Colour" },
-      { id:"face",  label:"😊 Face"  },
+    // tab buttons
+    const tabDefs: Array<{id:"color"|"face"|"costume", label:string}> = [
+      { id:"color",   label:"🎨 Colour"  },
+      { id:"face",    label:"😊 Face"    },
       { id:"costume", label:"🎩 Costume" },
     ];
-
-    const tabBtns: ReturnType<typeof k.add>[] = [];
-    tabs.forEach((t, i) => {
+    tabDefs.forEach((t, i) => {
       const tx = 80 + i*130;
-      const tb = k.add([k.rect(120, 34, { radius: 8 }), k.color(...C.panel),
-        k.area(), k.anchor("center"), k.pos(tx, 235), k.opacity(1)]);
-      k.add([k.text(t.label, { size: 12, font:"sans-serif" }),
-        k.color(...C.white), k.anchor("center"), k.pos(tx, 235)]);
+      const tb = k.add([k.rect(120, 32, { radius: 8 }),
+        k.color(...C.panel), k.area(), k.anchor("center"), k.pos(tx, 230)]);
+      k.add([k.text(t.label, { size: 11, font:"sans-serif" }),
+        k.color(...C.white), k.anchor("center"), k.pos(tx, 230)]);
       tb.onClick(() => { tab = t.id; rebuildGrid(); });
-      tabBtns.push(tb);
     });
 
-    // grid area
     let gridObjs: ReturnType<typeof k.add>[] = [];
 
-    function rebuildGrid(){
+    function rebuildGrid() {
       gridObjs.forEach(o => k.destroy(o));
       gridObjs = [];
 
       const items = tab === "color" ? COLORS : tab === "face" ? FACES : COSTUMES;
-      const cols2 = 4;
-      const cellW = 96, cellH = 80;
-      const gx0 = (VW - cols2*cellW)/2 + cellW/2;
-      const gy0 = 280;
+      const cellW = 96, cellH = 78, cols = 4;
+      const gx0 = (VW - cols*cellW)/2 + cellW/2;
+      const gy0 = 272;
 
       items.forEach((item, idx) => {
-        const col2 = idx % cols2;
-        const row2 = Math.floor(idx / cols2);
-        const cx2 = gx0 + col2*cellW;
-        const cy2 = gy0 + row2*cellH;
-        const isUnlocked = (tab==="color" ? save.unlockedColors : tab==="face" ? save.unlockedFaces : save.unlockedCostumes).includes(item.id);
-        const isSelected = tab==="color" ? selColor===item.id : tab==="face" ? selFace===item.id : selCostume===item.id;
+        const col = idx % cols;
+        const row = Math.floor(idx / cols);
+        const cx  = gx0 + col*cellW;
+        const cy  = gy0 + row*cellH;
+        const unlockedList = tab==="color" ? save.unlockedColors
+          : tab==="face" ? save.unlockedFaces : save.unlockedCostumes;
+        const isUnlocked = unlockedList.includes(item.id);
+        const isSelected = tab==="color" ? selColor===item.id
+          : tab==="face" ? selFace===item.id : selCostume===item.id;
 
-        const borderCol: [number,number,number] = isSelected ? C.gold : isUnlocked ? C.panel : [40,40,60];
+        const borderCol: [number,number,number] = isSelected ? C.gold : isUnlocked ? [50,50,72] : [32,32,48];
         const cell = k.add([k.rect(cellW-8, cellH-8, { radius: 10 }),
-          k.color(...borderCol), k.area(), k.anchor("center"), k.pos(cx2, cy2), k.opacity(1)]);
+          k.color(...borderCol), k.area(), k.anchor("center"), k.pos(cx, cy)]);
         gridObjs.push(cell);
 
-        if(tab==="color"){
+        if (tab === "color") {
           const c = item as typeof COLORS[0];
-          const cc = k.add([k.rect(cellW-20, cellH-24, { radius: 8 }),
-            k.color(...c.rgb), k.anchor("center"), k.pos(cx2, cy2-6)]);
-          gridObjs.push(cc);
-          const nl = k.add([k.text(c.name, { size: 9, font:"sans-serif" }),
-            k.color(...(isUnlocked ? C.white : C.dim)), k.anchor("center"), k.pos(cx2, cy2+26)]);
+          const swatch = k.add([k.rect(cellW-22, cellH-28, { radius: 8 }),
+            k.color(...c.rgb), k.anchor("center"), k.pos(cx, cy-8)]);
+          gridObjs.push(swatch);
+          const nl = k.add([k.text(c.name, { size: 8, font:"sans-serif" }),
+            k.color(...(isUnlocked ? C.white : C.dim)), k.anchor("center"), k.pos(cx, cy+24)]);
           gridObjs.push(nl);
         } else {
           const fi = item as typeof FACES[0];
-          const el = k.add([k.text(fi.emoji, { size: 28, font:"sans-serif" }),
-            k.color(255,255,255), k.anchor("center"), k.pos(cx2, cy2-6),
-            k.opacity(isUnlocked ? 1 : 0.35)]);
+          const el = k.add([k.text(fi.emoji, { size: 26, font:"sans-serif" }),
+            k.color(255,255,255), k.anchor("center"), k.pos(cx, cy-8),
+            k.opacity(isUnlocked ? 1 : 0.3)]);
           gridObjs.push(el);
-          const nl = k.add([k.text(fi.name, { size: 9, font:"sans-serif" }),
-            k.color(...(isUnlocked ? C.white : C.dim)), k.anchor("center"), k.pos(cx2, cy2+26)]);
+          const nl = k.add([k.text(fi.name, { size: 8, font:"sans-serif" }),
+            k.color(...(isUnlocked ? C.white : C.dim)), k.anchor("center"), k.pos(cx, cy+24)]);
           gridObjs.push(nl);
         }
 
-        if(!isUnlocked){
-          const lock = k.add([k.text("🔒", { size: 12, font:"sans-serif" }),
-            k.anchor("center"), k.pos(cx2+28, cy2-28)]);
-          gridObjs.push(lock);
-        }
-
-        if(isUnlocked){
+        if (!isUnlocked) {
+          const lk = k.add([k.text("🔒", { size: 11, font:"sans-serif" }),
+            k.anchor("center"), k.pos(cx+28, cy-26)]);
+          gridObjs.push(lk);
+        } else {
           cell.onClick(() => {
-            if(tab==="color") selColor = item.id;
-            else if(tab==="face") selFace = item.id;
-            else selCostume = item.id;
+            if (tab==="color")   selColor   = item.id;
+            else if (tab==="face")    selFace    = item.id;
+            else                 selCostume = item.id;
             rebuildGrid();
           });
         }
@@ -403,27 +432,25 @@ export function startGame(canvas: HTMLCanvasElement, onScore: (n: number) => voi
 
       // equip button
       const eqBtn = k.add([k.rect(180, 44, { radius: 10 }),
-        k.color(...C.green), k.area(), k.anchor("center"),
-        k.pos(VW/2, VH - 60)]);
+        k.color(...C.green), k.area(), k.anchor("center"), k.pos(VW/2, VH-56)]);
       gridObjs.push(eqBtn);
       const eqTxt = k.add([k.text("✓ Equip Selection", { size: 15, font:"sans-serif" }),
-        k.color(...C.white), k.anchor("center"), k.pos(VW/2, VH - 60)]);
+        k.color(...C.white), k.anchor("center"), k.pos(VW/2, VH-56)]);
       gridObjs.push(eqTxt);
       eqBtn.onClick(() => {
         save.equippedColor   = selColor;
         save.equippedFace    = selFace;
         save.equippedCostume = selCostume;
         writeSave(save);
-        spawnParticles(k, VW/2, VH-60, C.green, 12);
+        spawnParticles(k, VW/2, VH-56, C.green, 14);
+        flashMsg(k, "Saved! ✓");
       });
     }
 
     rebuildGrid();
   });
 
-  // ═══════════════════════════════════════════════════════════════════════════
-  // SCENE: SHOP
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ── SCENE: SHOP ───────────────────────────────────────────────────────────
   k.scene("shop", () => {
     save = loadSave();
     let shopTab: "color"|"face"|"costume" = "color";
@@ -431,86 +458,86 @@ export function startGame(canvas: HTMLCanvasElement, onScore: (n: number) => voi
     addBgStars(k);
     k.add([k.text("⭐ Star Shop", { size: 28, font:"sans-serif" }),
       k.color(...C.gold), k.anchor("center"), k.pos(VW/2, 36)]);
-    btn(k,"← Back", 52, 36, 80, 32, C.panel, C.white, () => k.go("menu"), 13);
+    btn(k, "← Back", 52, 36, 80, 30, C.panel, C.white, () => k.go("menu"), 13);
 
-    // star display
     const starDisp = k.add([k.text(`⭐ ${save.stars.toLocaleString()}`, { size: 16, font:"sans-serif" }),
       k.color(...C.gold), k.anchor("center"), k.pos(VW/2, 68)]);
 
-    // tabs
-    const shopTabs: Array<{id:"color"|"face"|"costume", label:string}> = [
-      { id:"color",   label:"🎨 Colours" },
-      { id:"face",    label:"😊 Faces"   },
-      { id:"costume", label:"🎩 Costumes"},
+    const shopTabDefs: Array<{id:"color"|"face"|"costume", label:string}> = [
+      { id:"color",   label:"🎨 Colours"  },
+      { id:"face",    label:"😊 Faces"    },
+      { id:"costume", label:"🎩 Costumes" },
     ];
-    shopTabs.forEach((t, i) => {
+    shopTabDefs.forEach((t, i) => {
       const tx = 80 + i*130;
-      const tb = k.add([k.rect(120, 32, { radius: 8 }), k.color(...C.panel),
-        k.area(), k.anchor("center"), k.pos(tx, 95)]);
+      const tb = k.add([k.rect(120, 30, { radius: 8 }),
+        k.color(...C.panel), k.area(), k.anchor("center"), k.pos(tx, 94)]);
       k.add([k.text(t.label, { size: 11, font:"sans-serif" }),
-        k.color(...C.white), k.anchor("center"), k.pos(tx, 95)]);
+        k.color(...C.white), k.anchor("center"), k.pos(tx, 94)]);
       tb.onClick(() => { shopTab = t.id; rebuildShop(); });
     });
 
     let shopObjs: ReturnType<typeof k.add>[] = [];
 
-    function rebuildShop(){
+    function rebuildShop() {
       shopObjs.forEach(o => k.destroy(o));
       shopObjs = [];
       save = loadSave();
       starDisp.text = `⭐ ${save.stars.toLocaleString()}`;
 
-      const items = shopTab === "color" ? COLORS : shopTab === "face" ? FACES : COSTUMES;
-      const cols2 = 2, cellW = 210, cellH = 80;
-      const gx0 = (VW - cols2*cellW)/2 + cellW/2;
-      const gy0 = 128;
+      const items = shopTab==="color" ? COLORS : shopTab==="face" ? FACES : COSTUMES;
+      const cellW = 210, cellH = 78, cols = 2;
+      const gx0 = (VW - cols*cellW)/2 + cellW/2;
+      const gy0 = 122;
 
       items.forEach((item, idx) => {
-        const col2 = idx % cols2;
-        const row2 = Math.floor(idx / cols2);
-        const cx2 = gx0 + col2*cellW;
-        const cy2 = gy0 + row2*cellH;
-        const cat = shopTab === "color" ? "colors" : shopTab === "face" ? "faces" : "costumes";
-        const owned = (shopTab==="color" ? save.unlockedColors : shopTab==="face" ? save.unlockedFaces : save.unlockedCostumes).includes(item.id);
-        const rarCol = RARITY_COLORS[item.rarity] ?? "#9ca3af";
-        const rarLabel = RARITY_LABELS[item.rarity] ?? "Common";
+        const col = idx % cols;
+        const row = Math.floor(idx / cols);
+        const cx  = gx0 + col*cellW;
+        const cy  = gy0 + row*cellH;
+        const cat = shopTab==="color" ? "colors" : shopTab==="face" ? "faces" : "costumes";
+        const ownedList = shopTab==="color" ? save.unlockedColors
+          : shopTab==="face" ? save.unlockedFaces : save.unlockedCostumes;
+        const owned = ownedList.includes(item.id);
 
         const cardBg = k.add([k.rect(cellW-8, cellH-6, { radius: 10 }),
-          k.color(...(owned ? [35,55,35] as [number,number,number] : C.panel)),
-          k.anchor("center"), k.pos(cx2, cy2)]);
+          k.color(...(owned ? [30,52,32] as [number,number,number] : C.panel)),
+          k.anchor("center"), k.pos(cx, cy)]);
         shopObjs.push(cardBg);
 
         const emoji = (item as typeof FACES[0]).emoji ?? "";
-        const el = k.add([k.text(emoji, { size: 24, font:"sans-serif" }),
-          k.color(255,255,255), k.anchor("center"), k.pos(cx2 - 70, cy2)]);
+        const el = k.add([k.text(emoji, { size: 22, font:"sans-serif" }),
+          k.color(255,255,255), k.anchor("center"), k.pos(cx-72, cy)]);
         shopObjs.push(el);
 
         const nl = k.add([k.text(item.name, { size: 12, font:"sans-serif" }),
-          k.color(...C.white), k.anchor("left"), k.pos(cx2 - 50, cy2 - 18)]);
+          k.color(...C.white), k.anchor("left"), k.pos(cx-52, cy-18)]);
         shopObjs.push(nl);
 
+        const rarHex = RARITY_COLORS[item.rarity] ?? "#9ca3af";
+        const rarLabel = RARITY_LABELS[item.rarity] ?? "🌱 Common";
         const rl = k.add([k.text(rarLabel, { size: 9, font:"sans-serif" }),
-          k.color(k.rgb(...hexToRgb(rarCol))), k.anchor("left"), k.pos(cx2 - 50, cy2 - 2)]);
+          k.color(...hexToRgb(rarHex)), k.anchor("left"), k.pos(cx-52, cy-2)]);
         shopObjs.push(rl);
 
-        if(owned){
+        if (owned) {
           const ol = k.add([k.text("✓ Owned", { size: 11, font:"sans-serif" }),
-            k.color(...C.green), k.anchor("left"), k.pos(cx2 - 50, cy2 + 16)]);
+            k.color(...C.green), k.anchor("left"), k.pos(cx-52, cy+16)]);
           shopObjs.push(ol);
-        } else if(item.price === 0){
+        } else if (item.price === 0) {
           const fl = k.add([k.text("Free!", { size: 11, font:"sans-serif" }),
-            k.color(...C.green), k.anchor("left"), k.pos(cx2 - 50, cy2 + 16)]);
+            k.color(...C.green), k.anchor("left"), k.pos(cx-52, cy+16)]);
           shopObjs.push(fl);
         } else {
-          const pb = k.add([k.rect(80, 26, { radius: 6 }),
-            k.color(...C.gold), k.area(), k.anchor("left"), k.pos(cx2 - 50, cy2 + 10)]);
+          const pb = k.add([k.rect(84, 26, { radius: 6 }),
+            k.color(...C.gold), k.area(), k.anchor("left"), k.pos(cx-52, cy+10)]);
           shopObjs.push(pb);
           const pt = k.add([k.text(`⭐ ${item.price}`, { size: 12, font:"sans-serif" }),
-            k.color(40,30,0), k.anchor("left"), k.pos(cx2 - 44, cy2 + 16)]);
+            k.color(40,30,0), k.anchor("left"), k.pos(cx-46, cy+16)]);
           shopObjs.push(pt);
           pb.onClick(() => {
             const next = spendStars(save, item.price);
-            if(!next){ flashMsg(k, "Not enough Stars! ⭐"); return; }
+            if (!next) { flashMsg(k, "Not enough Stars! ⭐"); return; }
             save = unlockItem(next, cat, item.id);
             writeSave(save);
             flashMsg(k, `Unlocked ${item.name}! 🎉`);
@@ -523,165 +550,203 @@ export function startGame(canvas: HTMLCanvasElement, onScore: (n: number) => voi
     rebuildShop();
   });
 
-  // ═══════════════════════════════════════════════════════════════════════════
-  // SCENE: PROFILE
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ── SCENE: PROFILE ────────────────────────────────────────────────────────
   k.scene("profile", () => {
     save = loadSave();
     addBgStars(k);
 
     k.add([k.text("👤 Profile", { size: 28, font:"sans-serif" }),
       k.color(...C.white), k.anchor("center"), k.pos(VW/2, 40)]);
-    btn(k,"← Back", 52, 40, 80, 32, C.panel, C.white, () => k.go("menu"), 13);
+    btn(k, "← Back", 52, 40, 80, 30, C.panel, C.white, () => k.go("menu"), 13);
 
-    // big cube preview
-    k.add([k.rect(200, 200, { radius: 20 }), k.color(...C.panel),
-      k.anchor("center"), k.pos(VW/2, 180)]);
+    k.add([k.rect(190, 190, { radius: 20 }), k.color(...C.panel),
+      k.anchor("center"), k.pos(VW/2, 178)]);
     k.onDraw(() => {
-      drawCube(k, VW/2, 180, 80, save.equippedColor, save.equippedFace, save.equippedCostume,
-        1 + Math.sin(k.time()*1.5)*0.06, 1 + Math.sin(k.time()*1.2)*0.03);
+      drawCube(k, VW/2, 178, 78,
+        save.equippedColor, save.equippedFace, save.equippedCostume,
+        1 + Math.sin(k.time()*1.5)*0.06,
+        1 + Math.sin(k.time()*1.1)*0.03);
     });
 
     k.add([k.text(`⭐ Stars: ${save.stars.toLocaleString()}`, { size: 20, font:"sans-serif" }),
-      k.color(...C.gold), k.anchor("center"), k.pos(VW/2, 300)]);
+      k.color(...C.gold), k.anchor("center"), k.pos(VW/2, 298)]);
 
-    const col = getColor(save.equippedColor);
+    const col  = getColor(save.equippedColor);
     const face = getFace(save.equippedFace);
-    const costume = getCostume(save.equippedCostume);
-
-    const info = [
+    const cos  = getCostume(save.equippedCostume);
+    [
       `🎨 Colour: ${col.name}`,
       `😊 Face: ${face.name} ${face.emoji}`,
-      `🎩 Costume: ${costume.name} ${costume.emoji}`,
-    ];
-    info.forEach((line, i) => {
+      `🎩 Costume: ${cos.name} ${cos.emoji}`,
+    ].forEach((line, i) => {
       k.add([k.text(line, { size: 14, font:"sans-serif" }),
-        k.color(...C.white), k.anchor("center"), k.pos(VW/2, 340 + i*28)]);
+        k.color(...C.white), k.anchor("center"), k.pos(VW/2, 338 + i*28)]);
     });
 
-    // level stats
     let completed = 0, totalStars = 0;
     LEVELS.forEach(lvl => {
       const ls = save.levels[lvl.id];
-      if(ls?.completed) completed++;
+      if (ls?.completed) completed++;
       totalStars += ls?.stars ?? 0;
     });
     k.add([k.text(`Levels: ${completed}/${LEVELS.length} completed`, { size: 13, font:"sans-serif" }),
-      k.color(...C.dim), k.anchor("center"), k.pos(VW/2, 440)]);
+      k.color(...C.dim), k.anchor("center"), k.pos(VW/2, 438)]);
     k.add([k.text(`Level Stars: ${totalStars} / ${LEVELS.length*3}`, { size: 13, font:"sans-serif" }),
-      k.color(...C.dim), k.anchor("center"), k.pos(VW/2, 464)]);
-    k.add([k.text(`Total Deaths: ${save.totalDeaths}`, { size: 13, font:"sans-serif" }),
-      k.color(...C.dim), k.anchor("center"), k.pos(VW/2, 488)]);
-
-    btn(k,"🎨 Customise Cube", VW/2, 560, 220, 44, C.accent, C.white, () => k.go("customise"));
+      k.color(...C.dim), k.anchor("center"), k.pos(VW/2, 462)]);
+    k.add([k.text(`Deaths: ${save.totalDeaths}`, { size: 13, font:"sans-serif" }),
+      k.color(...C.dim), k.anchor("center"), k.pos(VW/2, 486)]);
   });
 
-  // ═══════════════════════════════════════════════════════════════════════════
-  // SCENE: PLAY
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ── SCENE: PLAY ───────────────────────────────────────────────────────────
   k.scene("play", (levelId: string) => {
     save = loadSave();
-    const levelDef: LevelDef = LEVELS.find(l => l.id === levelId) ?? LEVELS[0]!;
+    const lvlDef: LevelDef | undefined = LEVELS.find(l => l.id === levelId);
+    if (!lvlDef) { k.go("levelselect"); return; }
 
-    // ── camera / world setup ────────────────────────────────────────────────
-    const GROUND_Y = 520;
+    // ── camera / world setup ─────────────────────────────────────────────
+    const GROUND_Y  = 520;   // top of ground surface
     const CUBE_SIZE = 44;
-    const JUMP_FORCE = -520;
-    let cameraX = 0;
+    const CAM_OFFSET_X = VW * 0.28; // cube stays left of centre
+
+    let camX       = 0;
     let starsCollected = 0;
-    let dead = false;
-    let finished = false;
-    let squishTimer = 0;
-    let squishY = 1;
-    let squishX = 1;
-    let beatFlash = 0;
-    let startTime = k.time();
+    let dead       = false;
+    let won        = false;
+    let deathTimer = 0;
+    let jumpSquish = 1;   // squishY for jump animation
+    let landTimer  = 0;   // frames of land squish
+    let onGround   = false;
+    let prevOnGround = false;
 
-    onScore(0);
-
-    // ── background gradient ─────────────────────────────────────────────────
+    // ── gradient background ──────────────────────────────────────────────
     k.onDraw(() => {
-      const [t, b] = levelDef.bgColors;
-      // top half
-      k.drawRect({ pos: k.vec2(0,0), width: VW, height: VH/2,
-        color: k.rgb(...t) });
-      // bottom half
-      k.drawRect({ pos: k.vec2(0, VH/2), width: VW, height: VH/2,
-        color: k.rgb(...b) });
+      const [t, b] = lvlDef.bgColors;
+      // draw two halves as gradient approximation
+      k.drawRect({ pos: k.vec2(0,0), width: VW, height: VH/2, color: k.rgb(...t) });
+      k.drawRect({ pos: k.vec2(0,VH/2), width: VW, height: VH/2, color: k.rgb(...b) });
+      // soft ground line
+      k.drawRect({ pos: k.vec2(0, GROUND_Y - camX*0), width: VW, height: 4,
+        color: k.rgb(...lvlDef.accentColor), opacity: 0.3 });
     });
 
-    // ── decorative bg elements ──────────────────────────────────────────────
-    k.onDraw(() => {
-      // clouds / stars based on level theme
-      const t = k.time();
-      for(let i=0;i<5;i++){
-        const cx2 = ((i*180 + t*18) % (VW+120)) - 60;
-        const cy2 = 80 + i*30;
-        k.drawEllipse({ pos: k.vec2(cx2, cy2), radiusX: 40, radiusY: 18,
-          color: k.rgb(255,255,255), opacity: 0.15 });
-        k.drawEllipse({ pos: k.vec2(cx2+20, cy2-8), radiusX: 28, radiusY: 14,
-          color: k.rgb(255,255,255), opacity: 0.12 });
-      }
-    });
+    // ── decorative clouds ────────────────────────────────────────────────
+    const cloudPositions: Array<{wx:number, wy:number, scale:number}> = [];
+    for (let i = 0; i < 12; i++) {
+      cloudPositions.push({
+        wx: k.rand(0, lvlDef.length),
+        wy: k.rand(60, 280),
+        scale: k.rand(0.6, 1.4),
+      });
+    }
 
-    // ── rhythm beat indicator ───────────────────────────────────────────────
-    const beatInterval = 60 / levelDef.bpm;
-    let nextBeat = beatInterval;
-    k.onUpdate(() => {
-      if(k.time() - startTime >= nextBeat - startTime % beatInterval){
-        nextBeat += beatInterval;
-        beatFlash = 0.15;
-      }
-      if(beatFlash > 0) beatFlash -= k.dt() * 3;
-    });
-    k.onDraw(() => {
-      if(beatFlash > 0){
-        k.drawRect({ pos: k.vec2(0,0), width: VW, height: VH,
-          color: k.rgb(255,255,255), opacity: beatFlash * 0.08 });
-      }
-      // beat dot
-      k.drawCircle({ pos: k.vec2(VW - 24, 24), radius: 8,
-        color: k.rgb(...levelDef.accentColor), opacity: 0.4 + beatFlash });
-    });
-
-    // ── world objects ───────────────────────────────────────────────────────
-    // We draw everything manually offset by cameraX (side-scrolling)
-
-    // Build obstacle data with moving platform state
-    interface PlatformState { def: ObstacleDef; offset: number; dir: number; disappearTimer: number; visible: boolean; stepped: boolean }
+    // ── obstacle & platform entities ────────────────────────────────────
+    interface PlatformState {
+      obj: ReturnType<typeof k.add>;
+      baseX: number;
+      phase: number;
+      disappeared: boolean;
+      disappearTimer: number;
+    }
     const platforms: PlatformState[] = [];
-    const staticBlocks: ObstacleDef[] = [];
 
-    levelDef.obstacles.forEach(obs => {
-      if(obs.type === "platform"){
-        platforms.push({ def: obs, offset: 0, dir: 1, disappearTimer: 0, visible: true, stepped: false });
-      } else {
-        staticBlocks.push(obs);
+    lvlDef.obstacles.forEach(obs => {
+      if (obs.type === "platform") {
+        const obj = k.add([
+          k.rect(obs.w, obs.h, { radius: 4 }),
+          k.color(...lvlDef.groundColor),
+          k.area(),
+          k.anchor("topleft"),
+          k.pos(obs.x - camX, obs.y),
+          "platform",
+        ]);
+        platforms.push({
+          obj,
+          baseX: obs.x,
+          phase: k.rand(0, Math.PI*2),
+          disappeared: false,
+          disappearTimer: 0,
+        });
+      } else if (obs.type === "block") {
+        k.add([
+          k.rect(obs.w, obs.h, { radius: 4 }),
+          k.color(...lvlDef.groundColor),
+          k.area(),
+          k.anchor("topleft"),
+          k.pos(obs.x - camX, obs.y),
+          "block",
+          { worldX: obs.x },
+        ]);
       }
     });
 
-    // Star collection state
-    const starState: { def: typeof levelDef.stars[0]; collected: boolean }[] =
-      levelDef.stars.map(s => ({ def: s, collected: false }));
+    // ── collectible stars ────────────────────────────────────────────────
+    interface StarState {
+      obj: ReturnType<typeof k.add>;
+      worldX: number;
+      worldY: number;
+      value: number;
+      collected: boolean;
+    }
+    const starObjs: StarState[] = lvlDef.stars.map(sd => ({
+      obj: k.add([
+        k.text("⭐", { size: 22, font:"sans-serif" }),
+        k.color(255,220,60),
+        k.anchor("center"),
+        k.pos(sd.x - camX, sd.y),
+        k.area({ shape: new k.Rect(k.vec2(-12,-12), 24, 24) }),
+        "star",
+      ]),
+      worldX: sd.x,
+      worldY: sd.y,
+      value: sd.value,
+      collected: false,
+    }));
 
-    // ── player ──────────────────────────────────────────────────────────────
-    let playerX = 80;
-    let playerY = GROUND_Y - CUBE_SIZE;
-    let velY = 0;
-    let onGround = false;
-    let jumpsLeft = 1; // single jump only
+    // ── goal flag ────────────────────────────────────────────────────────
+    const goalX = lvlDef.length - 80;
+    const goalObj = k.add([
+      k.rect(10, 120, { radius: 2 }),
+      k.color(...lvlDef.accentColor),
+      k.area(),
+      k.anchor("topleft"),
+      k.pos(goalX - camX, GROUND_Y - 120),
+      "goal",
+    ]);
+    k.add([
+      k.rect(50, 30, { radius: 4 }),
+      k.color(...C.green),
+      k.anchor("topleft"),
+      k.pos(goalX - camX + 10, GROUND_Y - 120),
+    ]);
 
-    // ── finish flag position ─────────────────────────────────────────────────
-    const finishX = levelDef.length - 100;
+    // ── player cube ──────────────────────────────────────────────────────
+    let cubeWorldX = 80;
+    let cubeY      = GROUND_Y - CUBE_SIZE;
+    let velY       = 0;
+    const GRAVITY  = lvlDef.gravity;
+    const JUMP_VEL = -Math.sqrt(2 * GRAVITY * 160); // jump ~160px high
+    const SPEED    = lvlDef.speed;
 
-    // ── jump function ────────────────────────────────────────────────────────
-    function tryJump(){
-      if(dead || finished) return;
-      if(jumpsLeft > 0){
-        velY = JUMP_FORCE;
-        jumpsLeft--;
-        squishY = 0.6; squishX = 1.3; squishTimer = 0.12;
-        spawnParticles(k, VW/2, playerY + CUBE_SIZE, getColor(save.equippedColor).rgb, 6);
+    // ── HUD ──────────────────────────────────────────────────────────────
+    k.add([k.rect(VW, 44, { radius: 0 }), k.color(0,0,0), k.anchor("topleft"),
+      k.pos(0,0), k.opacity(0.35), k.fixed()]);
+    const hudLevel = k.add([k.text(`${lvlDef.emoji} ${lvlDef.name}`, { size: 13, font:"sans-serif" }),
+      k.color(...C.white), k.anchor("left"), k.pos(10, 14), k.fixed()]);
+    const hudStars = k.add([k.text(`⭐ ${save.stars}`, { size: 13, font:"sans-serif" }),
+      k.color(...C.gold), k.anchor("right"), k.pos(VW-10, 14), k.fixed()]);
+    const hudCollected = k.add([k.text(`0/${lvlDef.stars.length} ⭐`, { size: 12, font:"sans-serif" }),
+      k.color(...C.gold), k.anchor("center"), k.pos(VW/2, 14), k.fixed()]);
+    void hudLevel; void hudStars;
+
+    // ── jump input ────────────────────────────────────────────────────────
+    function tryJump() {
+      if (dead || won) return;
+      if (onGround) {
+        velY = JUMP_VEL;
+        onGround = false;
+        jumpSquish = 0.65; // squish on takeoff
+        spawnParticles(k, CAM_OFFSET_X, cubeY + CUBE_SIZE,
+          getColor(save.equippedColor).rgb, 6);
       }
     }
 
@@ -689,284 +754,334 @@ export function startGame(canvas: HTMLCanvasElement, onScore: (n: number) => voi
     k.onMousePress(tryJump);
     k.onTouchStart(tryJump);
 
-    // ── HUD ─────────────────────────────────────────────────────────────────
-    k.onDraw(() => {
-      // top bar
-      drawRoundRect(k, 0, 0, VW, 44, 0, C.bg, 0.7);
-      k.drawText({ text: `${levelDef.emoji} ${levelDef.name}`,
-        pos: k.vec2(12, 8), size: 14, font:"sans-serif", color: k.rgb(...C.white) });
-      k.drawText({ text: `⭐ ${starsCollected}/${levelDef.stars.length}`,
-        pos: k.vec2(VW - 80, 8), size: 14, font:"sans-serif", color: k.rgb(...C.gold) });
-
-      // progress bar
-      const prog = Math.min(playerX / levelDef.length, 1);
-      k.drawRect({ pos: k.vec2(0, 40), width: VW, height: 4, color: k.rgb(40,40,60) });
-      k.drawRect({ pos: k.vec2(0, 40), width: VW * prog, height: 4,
-        color: k.rgb(...levelDef.accentColor) });
-    });
-
-    // ── main update ──────────────────────────────────────────────────────────
+    // ── main update ───────────────────────────────────────────────────────
     k.onUpdate(() => {
-      if(dead || finished) return;
-      const dt = k.dt();
-
-      // apply gravity
-      velY += levelDef.gravity * dt;
-      playerY += velY * dt;
-
-      // auto-move
-      playerX += levelDef.speed * dt;
-      cameraX = Math.max(0, playerX - VW/3);
-
-      // squish recovery
-      if(squishTimer > 0){
-        squishTimer -= dt;
-        if(squishTimer <= 0){ squishY = 1; squishX = 1; }
+      if (dead) {
+        deathTimer -= k.dt();
+        if (deathTimer <= 0) k.go("play", levelId);
+        return;
       }
+      if (won) return;
 
-      // ── collision with static blocks ─────────────────────────────────────
-      onGround = false;
-      const px = playerX - CUBE_SIZE/2;
-      const py = playerY;
-      const pw = CUBE_SIZE;
-      const ph = CUBE_SIZE;
+      // advance world
+      cubeWorldX += SPEED * k.dt();
+      camX = cubeWorldX - CAM_OFFSET_X;
 
-      for(const obs of staticBlocks){
-        if(obs.type === "gap") continue;
-        const ox = obs.x, oy = obs.y, ow = obs.w, oh = obs.h;
-        if(px + pw > ox && px < ox + ow && py + ph > oy && py < oy + oh){
-          // coming from above
-          if(velY >= 0 && py + ph - velY*dt <= oy + 2){
-            playerY = oy - ph;
-            velY = 0;
-            onGround = true;
-            jumpsLeft = 1;
-            if(squishTimer <= 0){ squishY = 1.25; squishX = 0.8; squishTimer = 0.1; }
-          } else {
-            // side / bottom hit = death
-            triggerDeath();
-            return;
-          }
+      // physics
+      velY += GRAVITY * k.dt();
+      cubeY += velY * k.dt();
+
+      // jump squish animation
+      if (jumpSquish < 1) jumpSquish = Math.min(1, jumpSquish + k.dt() * 4);
+      if (landTimer > 0) { landTimer -= k.dt(); }
+
+      // ── reposition all world objects based on camX ─────────────────
+      // blocks
+      k.get("block").forEach(b => {
+        const bwx = (b as ReturnType<typeof k.add> & { worldX: number }).worldX;
+        b.pos.x = bwx - camX;
+      });
+
+      // platforms (moving + disappearing)
+      const lvlObs = lvlDef.obstacles;
+      platforms.forEach((ps, pi) => {
+        const obsDef = lvlObs.filter(o => o.type === "platform")[pi];
+        if (!obsDef) return;
+
+        if (obsDef.moving && obsDef.moveRange && obsDef.moveSpeed) {
+          ps.phase += k.dt() * (obsDef.moveSpeed / 60);
+          const offsetX = Math.sin(ps.phase) * obsDef.moveRange;
+          ps.obj.pos.x = (obsDef.x + offsetX) - camX;
+        } else {
+          ps.obj.pos.x = obsDef.x - camX;
         }
-      }
+        ps.obj.pos.y = obsDef.y;
 
-      // ── moving / disappearing platforms ──────────────────────────────────
-      for(const p of platforms){
-        if(!p.visible) continue;
-        const pd = p.def;
-        // update moving
-        if(pd.moving && pd.moveRange && pd.moveSpeed){
-          p.offset += p.dir * pd.moveSpeed * dt;
-          if(Math.abs(p.offset) >= pd.moveRange) p.dir *= -1;
-        }
-        const ox = pd.x + (pd.moving ? p.offset : 0);
-        const oy = pd.y;
-        const ow = pd.w, oh = pd.h;
-        if(px + pw > ox && px < ox + ow && py + ph > oy && py < oy + oh){
-          if(velY >= 0 && py + ph - velY*dt <= oy + 4){
-            playerY = oy - ph;
-            velY = 0;
-            onGround = true;
-            jumpsLeft = 1;
-            if(!p.stepped){
-              p.stepped = true;
-              if(pd.disappear){ p.disappearTimer = 0.5; }
+        // disappearing
+        if (obsDef.disappear && !ps.disappeared) {
+          // check if cube is standing on it
+          const screenX = CAM_OFFSET_X;
+          const platLeft  = ps.obj.pos.x;
+          const platRight = ps.obj.pos.x + obsDef.w;
+          const platTop   = ps.obj.pos.y;
+          if (
+            screenX + CUBE_SIZE/2 > platLeft &&
+            screenX - CUBE_SIZE/2 < platRight &&
+            Math.abs(cubeY + CUBE_SIZE - platTop) < 6 &&
+            velY >= 0
+          ) {
+            ps.disappearTimer += k.dt();
+            if (ps.disappearTimer > 0.5) {
+              ps.disappeared = true;
+              k.destroy(ps.obj);
             }
-            if(squishTimer <= 0){ squishY = 1.2; squishX = 0.85; squishTimer = 0.1; }
           }
         }
-        // disappear countdown
-        if(p.stepped && pd.disappear && p.disappearTimer > 0){
-          p.disappearTimer -= dt;
-          if(p.disappearTimer <= 0){ p.visible = false; }
+      });
+
+      // goal
+      goalObj.pos.x = goalX - camX;
+      goalObj.pos.y = GROUND_Y - 120;
+
+      // stars
+      starObjs.forEach(ss => {
+        if (!ss.collected) {
+          ss.obj.pos.x = ss.worldX - camX;
+          ss.obj.pos.y = ss.worldY + Math.sin(k.time()*2 + ss.worldX)*5;
+        }
+      });
+
+      // ── ground collision ──────────────────────────────────────────────
+      prevOnGround = onGround;
+      onGround = false;
+
+      // main ground
+      if (cubeY + CUBE_SIZE >= GROUND_Y) {
+        // check it's not a gap
+        const isGap = lvlDef.obstacles.some(obs =>
+          obs.type === "block" &&
+          cubeWorldX + CUBE_SIZE/2 > obs.x &&
+          cubeWorldX - CUBE_SIZE/2 < obs.x + obs.w &&
+          false // gaps are represented by ABSENCE of ground blocks
+        );
+        void isGap;
+
+        // check if there's ground beneath us
+        const hasGround = lvlDef.obstacles.some(obs =>
+          obs.type === "block" &&
+          obs.y <= GROUND_Y &&
+          cubeWorldX + CUBE_SIZE*0.4 > obs.x &&
+          cubeWorldX - CUBE_SIZE*0.4 < obs.x + obs.w
+        );
+
+        if (hasGround) {
+          cubeY = GROUND_Y - CUBE_SIZE;
+          velY  = 0;
+          onGround = true;
         }
       }
 
-      // ── fall into gap = death ─────────────────────────────────────────────
-      if(playerY > GROUND_Y + 80){
-        triggerDeath();
+      // platform collisions
+      if (!onGround && velY > 0) {
+        platforms.forEach(ps => {
+          if (ps.disappeared) return;
+          const platLeft  = ps.obj.pos.x;
+          const platRight = ps.obj.pos.x + (ps.obj.width ?? 80);
+          const platTop   = ps.obj.pos.y;
+          const screenX   = CAM_OFFSET_X;
+          if (
+            screenX + CUBE_SIZE*0.4 > platLeft &&
+            screenX - CUBE_SIZE*0.4 < platRight &&
+            cubeY + CUBE_SIZE >= platTop &&
+            cubeY + CUBE_SIZE <= platTop + 20 + velY * k.dt() * 2
+          ) {
+            cubeY    = platTop - CUBE_SIZE;
+            velY     = 0;
+            onGround = true;
+          }
+        });
+      }
+
+      // block top collisions (jumping onto blocks)
+      if (!onGround && velY > 0) {
+        k.get("block").forEach(b => {
+          const bx  = b.pos.x;
+          const bDef = lvlDef.obstacles.find(o =>
+            o.type === "block" &&
+            Math.abs(o.x - (bx + camX)) < 2
+          );
+          if (!bDef) return;
+          const blockTop = bDef.y;
+          const screenX  = CAM_OFFSET_X;
+          if (
+            screenX + CUBE_SIZE*0.4 > b.pos.x &&
+            screenX - CUBE_SIZE*0.4 < b.pos.x + bDef.w &&
+            cubeY + CUBE_SIZE >= blockTop &&
+            cubeY + CUBE_SIZE <= blockTop + 16 + velY * k.dt() * 2
+          ) {
+            cubeY    = blockTop - CUBE_SIZE;
+            velY     = 0;
+            onGround = true;
+          }
+        });
+      }
+
+      // land squish
+      if (!prevOnGround && onGround) {
+        landTimer  = 0.15;
+        jumpSquish = 1.35; // squash on land
+        spawnParticles(k, CAM_OFFSET_X, cubeY + CUBE_SIZE,
+          lvlDef.groundColor, 5);
+      }
+
+      // ── star collection ───────────────────────────────────────────────
+      starObjs.forEach(ss => {
+        if (ss.collected) return;
+        const dx = Math.abs(CAM_OFFSET_X - ss.obj.pos.x);
+        const dy = Math.abs(cubeY + CUBE_SIZE/2 - ss.obj.pos.y);
+        if (dx < CUBE_SIZE/2 + 14 && dy < CUBE_SIZE/2 + 14) {
+          ss.collected = true;
+          k.destroy(ss.obj);
+          starsCollected++;
+          save = addStars(save, ss.value);
+          onScore(save.stars);
+          hudStars.text  = `⭐ ${save.stars}`;
+          hudCollected.text = `${starsCollected}/${lvlDef.stars.length} ⭐`;
+          spawnParticles(k, CAM_OFFSET_X, cubeY, C.gold, 10);
+          flashMsg(k, `+${ss.value} ⭐`);
+        }
+      });
+
+      // ── death: fall into gap ──────────────────────────────────────────
+      if (cubeY > VH + 100 && !dead) {
+        die();
         return;
       }
 
-      // ── star collection ───────────────────────────────────────────────────
-      starState.forEach(s => {
-        if(s.collected) return;
-        const dx = playerX - s.def.x;
-        const dy = (playerY + CUBE_SIZE/2) - s.def.y;
-        if(Math.sqrt(dx*dx+dy*dy) < 30){
-          s.collected = true;
-          starsCollected++;
-          onScore(starsCollected * 10);
-          spawnParticles(k, s.def.x - cameraX, s.def.y, C.gold, 10);
-          save = addStars(save, s.def.value * 5);
+      // ── death: hit block from side ────────────────────────────────────
+      k.get("block").forEach(b => {
+        if (dead) return;
+        const bx   = b.pos.x;
+        const bDef = lvlDef.obstacles.find(o =>
+          o.type === "block" && Math.abs(o.x - (bx + camX)) < 2
+        );
+        if (!bDef) return;
+        const screenX = CAM_OFFSET_X;
+        const overlapX = screenX + CUBE_SIZE/2 > b.pos.x && screenX - CUBE_SIZE/2 < b.pos.x + bDef.w;
+        const overlapY = cubeY < bDef.y + bDef.h && cubeY + CUBE_SIZE > bDef.y;
+        if (overlapX && overlapY) {
+          // only die if hitting the side (not landing on top)
+          const fromTop = cubeY + CUBE_SIZE <= bDef.y + 12;
+          if (!fromTop) die();
         }
       });
 
-      // ── finish check ─────────────────────────────────────────────────────
-      if(playerX >= finishX){ triggerFinish(); }
-    });
-
-    // ── drawing ──────────────────────────────────────────────────────────────
-    k.onDraw(() => {
-      const camX = cameraX;
-
-      // ground / static blocks
-      staticBlocks.forEach(obs => {
-        const sx = obs.x - camX;
-        if(sx > VW + 100 || sx + obs.w < -100) return;
-        const col: [number,number,number] = obs.type === "block"
-          ? levelDef.groundColor
-          : levelDef.accentColor;
-        drawRoundRect(k, sx, obs.y, obs.w, obs.h, 6, col);
-        // top highlight
-        k.drawRect({ pos: k.vec2(sx+4, obs.y+2), width: obs.w-8, height: 4,
-          radius: 2, color: k.rgb(255,255,255), opacity: 0.15 });
-      });
-
-      // platforms
-      platforms.forEach(p => {
-        if(!p.visible) return;
-        const pd = p.def;
-        const sx = pd.x + (pd.moving ? p.offset : 0) - camX;
-        if(sx > VW + 100 || sx + pd.w < -100) return;
-        const alpha = pd.disappear && p.stepped ? Math.max(0.2, p.disappearTimer / 0.5) : 1;
-        drawRoundRect(k, sx, pd.y, pd.w, pd.h, 6, levelDef.accentColor, alpha);
-        k.drawRect({ pos: k.vec2(sx+4, pd.y+2), width: pd.w-8, height: 4,
-          radius: 2, color: k.rgb(255,255,255), opacity: 0.25 * alpha });
-      });
-
-      // stars
-      starState.forEach(s => {
-        if(s.collected) return;
-        const sx = s.def.x - camX;
-        if(sx < -40 || sx > VW + 40) return;
-        const bob = Math.sin(k.time()*3 + s.def.x)*5;
-        k.drawText({ text: s.def.value > 1 ? "🌟" : "⭐",
-          pos: k.vec2(sx, s.def.y + bob),
-          size: 22, font:"sans-serif", anchor:"center", color: k.rgb(255,220,60) });
-      });
-
-      // finish flag
-      const fx = finishX - camX;
-      if(fx > -20 && fx < VW + 20){
-        k.drawRect({ pos: k.vec2(fx, GROUND_Y - 120), width: 4, height: 120,
-          color: k.rgb(...C.white) });
-        k.drawRect({ pos: k.vec2(fx+4, GROUND_Y - 120), width: 32, height: 20,
-          radius: 3, color: k.rgb(...C.green) });
-        k.drawText({ text:"🏁", pos: k.vec2(fx+8, GROUND_Y-118),
-          size: 16, font:"sans-serif", color: k.rgb(255,255,255) });
-      }
-
-      // cube
-      if(!dead){
-        const screenX = playerX - camX;
-        drawCube(k, screenX, playerY + CUBE_SIZE/2, CUBE_SIZE,
-          save.equippedColor, save.equippedFace, save.equippedCostume,
-          squishY, squishX);
+      // ── reach goal ────────────────────────────────────────────────────
+      const goalScreenX = goalX - camX;
+      if (Math.abs(CAM_OFFSET_X - goalScreenX) < CUBE_SIZE && !won) {
+        winLevel();
       }
     });
 
-    // ── death ────────────────────────────────────────────────────────────────
-    function triggerDeath(){
-      if(dead) return;
+    function die() {
+      if (dead || won) return;
       dead = true;
+      deathTimer = 0.8;
       save.totalDeaths++;
       writeSave(save);
-      spawnParticles(k, playerX - cameraX, playerY, getColor(save.equippedColor).rgb, 16);
-      k.wait(0.8, () => k.go("play", levelId));
+      spawnParticles(k, CAM_OFFSET_X, cubeY + CUBE_SIZE/2,
+        getColor(save.equippedColor).rgb, 16);
+      flashMsg(k, "Oops! Try again ✨");
     }
 
-    // ── finish ───────────────────────────────────────────────────────────────
-    function triggerFinish(){
-      if(finished) return;
-      finished = true;
-      const elapsed = k.time() - startTime;
-      const prevSave = save.levels[levelId] ?? { completed: false, stars: 0, bestTime: 999999 };
-      const newStarCount = Math.min(3, starsCollected + (starsCollected >= levelDef.stars.length ? 1 : 0));
-      const bonusStars = (newStarCount > (prevSave.stars ?? 0)) ? (newStarCount - (prevSave.stars ?? 0)) * 10 : 0;
-      save = addStars(save, 20 + bonusStars + starsCollected * 5);
-      save.levels[levelId] = {
-        completed: true,
-        stars: Math.max(prevSave.stars ?? 0, starsCollected),
-        bestTime: Math.min(prevSave.bestTime ?? 999999, elapsed),
+    function winLevel() {
+      won = true;
+      // award completion stars
+      const bonus = 10 + starsCollected * 5;
+      save = addStars(save, bonus);
+      onScore(save.stars);
+
+      // update level save
+      const prev = save.levels[lvlDef.id] ?? { completed: false, stars: 0, bestTime: 0 };
+      save.levels = {
+        ...save.levels,
+        [lvlDef.id]: {
+          completed: true,
+          stars: Math.max(prev.stars, starsCollected),
+          bestTime: 0,
+        },
       };
       writeSave(save);
-      onScore(starsCollected * 10 + 20);
-      k.wait(0.3, () => k.go("levelcomplete", levelId, starsCollected, elapsed));
+
+      spawnParticles(k, CAM_OFFSET_X, cubeY, C.gold, 20);
+      k.wait(1.6, () => k.go("levelcomplete", lvlDef.id, starsCollected, bonus));
     }
-  });
 
-  // ═══════════════════════════════════════════════════════════════════════════
-  // SCENE: LEVEL COMPLETE
-  // ═══════════════════════════════════════════════════════════════════════════
-  k.scene("levelcomplete", (levelId: string, starsGot: number, elapsed: number) => {
-    save = loadSave();
-    const lvl = LEVELS.find(l => l.id === levelId) ?? LEVELS[0]!;
-    const nextIdx = LEVELS.findIndex(l => l.id === levelId) + 1;
-    const nextLvl = nextIdx < LEVELS.length ? LEVELS[nextIdx] : null;
-
-    addBgStars(k);
-    spawnParticles(k, VW/2, VH/2, C.gold, 24);
-    k.wait(0.3, () => spawnParticles(k, VW/3, VH/3, C.accent, 16));
-    k.wait(0.6, () => spawnParticles(k, VW*2/3, VH*2/3, C.green, 16));
-
-    k.add([k.text("Level Complete! 🎉", { size: 30, font:"sans-serif" }),
-      k.color(...C.gold), k.anchor("center"), k.pos(VW/2, 120)]);
-    k.add([k.text(`${lvl.emoji} ${lvl.name}`, { size: 18, font:"sans-serif" }),
-      k.color(...C.white), k.anchor("center"), k.pos(VW/2, 160)]);
-
-    // star display
-    const maxStars = lvl.stars.length;
-    const starStr = Array.from({length: maxStars}, (_, i) => i < starsGot ? "⭐" : "☆").join(" ");
-    k.add([k.text(starStr, { size: 32, font:"sans-serif" }),
-      k.color(...C.gold), k.anchor("center"), k.pos(VW/2, 210)]);
-
-    k.add([k.text(`Time: ${elapsed.toFixed(1)}s`, { size: 16, font:"sans-serif" }),
-      k.color(...C.dim), k.anchor("center"), k.pos(VW/2, 260)]);
-    k.add([k.text(`Stars earned: +${20 + starsGot*5}`, { size: 16, font:"sans-serif" }),
-      k.color(...C.gold), k.anchor("center"), k.pos(VW/2, 290)]);
-    k.add([k.text(`Total: ⭐ ${save.stars.toLocaleString()}`, { size: 18, font:"sans-serif" }),
-      k.color(...C.gold), k.anchor("center"), k.pos(VW/2, 320)]);
-
-    // cube preview
+    // ── draw everything ───────────────────────────────────────────────────
     k.onDraw(() => {
-      drawCube(k, VW/2, 400, 60, save.equippedColor, save.equippedFace, save.equippedCostume,
-        1 + Math.sin(k.time()*2)*0.06);
+      // clouds
+      cloudPositions.forEach(c => {
+        const sx = c.wx - camX;
+        if (sx < -200 || sx > VW + 200) return;
+        const sc = c.scale;
+        k.drawRect({ pos: k.vec2(sx, c.wy),          width:70*sc, height:28*sc, radius:14*sc, color:k.rgb(255,255,255), opacity:0.55 });
+        k.drawRect({ pos: k.vec2(sx+20*sc, c.wy-14*sc), width:50*sc, height:26*sc, radius:13*sc, color:k.rgb(255,255,255), opacity:0.55 });
+        k.drawRect({ pos: k.vec2(sx-10*sc, c.wy-8*sc),  width:40*sc, height:22*sc, radius:11*sc, color:k.rgb(255,255,255), opacity:0.55 });
+      });
+
+      // goal flag
+      const gsx = goalX - camX;
+      k.drawRect({ pos: k.vec2(gsx, GROUND_Y-120), width:10, height:120, radius:2,
+        color: k.rgb(...lvlDef.accentColor) });
+      k.drawRect({ pos: k.vec2(gsx+10, GROUND_Y-120), width:50, height:30, radius:4,
+        color: k.rgb(...C.green) });
+      k.drawText({ text:"GOAL", pos: k.vec2(gsx+35, GROUND_Y-105),
+        size:11, font:"sans-serif", anchor:"center", color:k.rgb(255,255,255) });
+
+      // cube with squish
+      const squishY = landTimer > 0 ? 1.3 : jumpSquish;
+      const squishX = landTimer > 0 ? 0.75 : (jumpSquish < 1 ? 1.2 : 1);
+      drawCube(k, CAM_OFFSET_X, cubeY + CUBE_SIZE/2, CUBE_SIZE,
+        save.equippedColor, save.equippedFace, save.equippedCostume,
+        squishY, squishX);
+
+      // death flash
+      if (dead) {
+        k.drawRect({ pos: k.vec2(0,0), width:VW, height:VH,
+          color: k.rgb(255,80,80), opacity: 0.18 });
+      }
     });
 
-    btn(k,"↩ Retry Level", VW/2, 490, 200, 44, C.panel, C.white,
-      () => k.go("play", levelId));
+    // ── rhythm beat indicator ─────────────────────────────────────────────
+    const beatInterval = 60 / lvlDef.bpm;
+    let beatPhase = 0;
+    k.onUpdate(() => {
+      beatPhase = (beatPhase + k.dt() / beatInterval) % 1;
+    });
+    k.onDraw(() => {
+      const pulse = Math.max(0, 1 - beatPhase * 3);
+      if (pulse > 0) {
+        k.drawRect({ pos: k.vec2(0, VH-4), width: VW * pulse, height: 4,
+          color: k.rgb(...lvlDef.accentColor), opacity: 0.7 });
+      }
+    });
+  });
 
-    if(nextLvl){
-      btn(k,`Next: ${nextLvl.emoji} ${nextLvl.name} →`, VW/2, 544, 240, 44, C.accent, C.white,
-        () => k.go("play", nextLvl.id), 14);
-    } else {
-      k.add([k.text("🌈 You completed ALL levels! Amazing!", { size: 14, font:"sans-serif" }),
-        k.color(...C.accent), k.anchor("center"), k.pos(VW/2, 544)]);
+  // ── SCENE: LEVEL COMPLETE ─────────────────────────────────────────────────
+  k.scene("levelcomplete", (levelId: string, starsGot: number, bonus: number) => {
+    save = loadSave();
+    addBgStars(k);
+    spawnParticles(k, VW/2, VH/2, C.gold, 20);
+
+    k.add([k.text("Level Complete! 🎉", { size: 30, font:"sans-serif" }),
+      k.color(...C.gold), k.anchor("center"), k.pos(VW/2, 180)]);
+
+    const lvl = LEVELS.find(l => l.id === levelId);
+    if (lvl) {
+      k.add([k.text(`${lvl.emoji} ${lvl.name}`, { size: 18, font:"sans-serif" }),
+        k.color(...C.white), k.anchor("center"), k.pos(VW/2, 222)]);
     }
 
-    btn(k,"🏠 Menu", VW/2, 600, 160, 40, C.panel, C.dim, () => k.go("menu"), 13);
+    const starStr = [0,1,2].map(s => s < starsGot ? "⭐" : "☆").join("  ");
+    k.add([k.text(starStr, { size: 36, font:"sans-serif" }),
+      k.color(...C.gold), k.anchor("center"), k.pos(VW/2, 288)]);
+
+    k.add([k.text(`+${bonus} ⭐ earned!`, { size: 18, font:"sans-serif" }),
+      k.color(...C.gold), k.anchor("center"), k.pos(VW/2, 340)]);
+    k.add([k.text(`Total: ⭐ ${save.stars.toLocaleString()}`, { size: 16, font:"sans-serif" }),
+      k.color(...C.dim), k.anchor("center"), k.pos(VW/2, 372)]);
+
+    const lvlIdx = LEVELS.findIndex(l => l.id === levelId);
+    const nextLvl = LEVELS[lvlIdx + 1];
+
+    btn(k, "▶ Next Level", VW/2, 444, 200, 48, C.green, C.white,
+      () => nextLvl ? k.go("play", nextLvl.id) : k.go("levelselect"), 18);
+    btn(k, "↩ Retry",     VW/2, 504, 200, 44, C.panel, C.white,
+      () => k.go("play", levelId));
+    btn(k, "🏠 Menu",      VW/2, 556, 200, 44, C.panel, C.white,
+      () => k.go("menu"));
   });
 
-  // ── start ──────────────────────────────────────────────────────────────────
   k.go("menu");
   return () => k.quit();
-}
-
-// ── utility ──────────────────────────────────────────────────────────────────
-function flashMsg(k: K, msg: string){
-  const t = k.add([k.text(msg, { size: 18, font:"sans-serif" }),
-    k.color(255,255,255), k.anchor("center"), k.pos(VW/2, VH/2 - 40), k.opacity(1)]);
-  const up = k.onUpdate(() => {
-    t.opacity -= k.dt() * 1.5;
-    t.pos.y -= k.dt() * 30;
-    if(t.opacity <= 0){ k.destroy(t); up.cancel(); }
-  });
-}
-
-function hexToRgb(hex: string): [number,number,number] {
-  const r = parseInt(hex.slice(1,3),16);
-  const g = parseInt(hex.slice(3,5),16);
-  const b = parseInt(hex.slice(5,7),16);
-  return [r||0, g||0, b||0];
 }
