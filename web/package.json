@@ -1,5 +1,5 @@
 {
-  "name": "@APPNAME/web",
+  "name": "@cubisworld/web",
   "private": true,
   "type": "module",
   "scripts": {
