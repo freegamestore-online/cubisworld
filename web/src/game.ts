@@ -1,5 +1,6 @@
 import kaplay from "kaplay";
-import type { SaveData, LevelDef } from "./types";
+import type { GameObj, PosComp, RectComp } from "kaplay";
+import type { LevelDef } from "./types";
 import { LEVELS } from "./lib/levelData";
 import { COLORS, FACES, COSTUMES, getColor, getFace, getCostume, RARITY_COLORS, RARITY_LABELS } from "./lib/cosmetics";
 import { loadSave, writeSave, addStars, spendStars, unlockItem } from "./lib/saveData";
@@ -600,8 +601,9 @@ export function startGame(canvas: HTMLCanvasElement, onScore: (n: number) => voi
   // ── SCENE: PLAY ───────────────────────────────────────────────────────────
   k.scene("play", (levelId: string) => {
     save = loadSave();
-    const lvlDef: LevelDef | undefined = LEVELS.find(l => l.id === levelId);
-    if (!lvlDef) { k.go("levelselect"); return; }
+    const foundLvl = LEVELS.find(l => l.id === levelId);
+    if (!foundLvl) { k.go("levelselect"); return; }
+    const lvlDef: LevelDef = foundLvl;
 
     // ── camera / world setup ─────────────────────────────────────────────
     const GROUND_Y  = 520;   // top of ground surface
@@ -641,7 +643,7 @@ export function startGame(canvas: HTMLCanvasElement, onScore: (n: number) => voi
 
     // ── obstacle & platform entities ────────────────────────────────────
     interface PlatformState {
-      obj: ReturnType<typeof k.add>;
+      obj: GameObj<PosComp | RectComp>;
       baseX: number;
       phase: number;
       disappeared: boolean;
@@ -681,7 +683,7 @@ export function startGame(canvas: HTMLCanvasElement, onScore: (n: number) => voi
 
     // ── collectible stars ────────────────────────────────────────────────
     interface StarState {
-      obj: ReturnType<typeof k.add>;
+      obj: GameObj<PosComp>;
       worldX: number;
       worldY: number;
       value: number;
